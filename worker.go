@@ -36,7 +36,7 @@ func (wp *workerPool[T]) Start(callback func(data T) error) {
 			for data := range wp.taskChan {
 				err := callback(data)
 				if err != nil {
-					logrus.Fatalf("error: %v", err)
+					logrus.Errorf("error: %v", err)
 				}
 			}
 		}()
