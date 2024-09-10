@@ -71,3 +71,8 @@ func (wp *workerPool[T]) Stop() {
 		wp.wg.Wait()       // 等待所有协程完成任务
 	})
 }
+
+// PendingTasks 返回未处理的任务数量
+func (wp *workerPool[T]) PendingTasks() int {
+	return len(wp.taskChan)
+}
