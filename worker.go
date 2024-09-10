@@ -17,14 +17,30 @@ type workerPool[T any] struct {
 	taskChan   chan T
 	wg         sync.WaitGroup
 	once       sync.Once
+	errHandler func(err error)
+}
+
+type Option[T any] func(pool *workerPool[T])
+
+func WithErrHandler[T any](in func(err error)) Option[T] {
+	return func(wp *workerPool[T]) {
+		wp.errHandler = in
+	}
 }
 
 // New 创建新的 workerPool 实例
-func New[T any](numWorkers int) Pool[T] {
-	return &workerPool[T]{
+func New[T any](numWorkers int, options ...Option[T]) Pool[T] {
+	wp := &workerPool[T]{
 		numWorkers: numWorkers,
 		taskChan:   make(chan T),
+		errHandler: func(err error) {
+			logrus.Error(err)
+		},
 	}
+	for _, o := range options {
+		o(wp)
+	}
+	return wp
 }
 
 // Start 启动协程池
@@ -36,7 +52,7 @@ func (wp *workerPool[T]) Start(callback func(data T) error) {
 			for data := range wp.taskChan {
 				err := callback(data)
 				if err != nil {
-					logrus.Errorf("error: %v", err)
+					wp.errHandler(err)
 				}
 			}
 		}()
