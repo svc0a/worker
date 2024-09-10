@@ -27,12 +27,17 @@ func WithErrHandler[T any](in func(err error)) Option[T] {
 		wp.errHandler = in
 	}
 }
+func WithChanSize[T any](in int64) Option[T] {
+	return func(wp *workerPool[T]) {
+		wp.taskChan = make(chan T, in)
+	}
+}
 
 // New 创建新的 workerPool 实例
 func New[T any](numWorkers int, options ...Option[T]) Pool[T] {
 	wp := &workerPool[T]{
 		numWorkers: numWorkers,
-		taskChan:   make(chan T),
+		taskChan:   make(chan T, numWorkers),
 		errHandler: func(err error) {
 			logrus.Error(err)
 		},
