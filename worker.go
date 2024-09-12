@@ -55,10 +55,7 @@ func (wp *workerPool[T, Err]) Start(callback func(data T) Err) {
 		go func() {
 			defer wp.wg.Done()
 			for data := range wp.taskChan {
-				err := callback(data)
-				if err != nil {
-					wp.errHandler(err)
-				}
+				wp.errHandler(callback(data))
 			}
 		}()
 	}
