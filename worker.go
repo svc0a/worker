@@ -5,14 +5,14 @@ import (
 	"sync"
 )
 
-type Pool[T any, Err any] interface {
+type Pool[T any, Err error] interface {
 	Start(callback func(data T) Err)
 	Submit(data T)
 	Stop()
 }
 
 // workerPool 管理协程池
-type workerPool[T any, Err any] struct {
+type workerPool[T any, Err error] struct {
 	numWorkers int
 	taskChan   chan T
 	wg         sync.WaitGroup
@@ -20,21 +20,21 @@ type workerPool[T any, Err any] struct {
 	errHandler func(rsp Err)
 }
 
-type Option[T any, Err any] func(pool *workerPool[T, Err])
+type Option[T any, Err error] func(pool *workerPool[T, Err])
 
-func WithErrHandler[T any, Err any](in func(err Err)) Option[T, Err] {
+func WithErrHandler[T any, Err error](in func(err Err)) Option[T, Err] {
 	return func(wp *workerPool[T, Err]) {
 		wp.errHandler = in
 	}
 }
-func WithChanSize[T any, Err any](in int64) Option[T, Err] {
+func WithChanSize[T any, Err error](in int64) Option[T, Err] {
 	return func(wp *workerPool[T, Err]) {
 		wp.taskChan = make(chan T, in)
 	}
 }
 
 // New 创建新的 workerPool 实例
-func New[T any, Err any](numWorkers int, options ...Option[T, Err]) Pool[T, Err] {
+func New[T any, Err error](numWorkers int, options ...Option[T, Err]) Pool[T, Err] {
 	wp := &workerPool[T, Err]{
 		numWorkers: numWorkers,
 		taskChan:   make(chan T, numWorkers),
