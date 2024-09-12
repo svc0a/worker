@@ -3,7 +3,6 @@ package worker
 import (
 	"github.com/sirupsen/logrus"
 	"sync"
-	"time"
 )
 
 type Pool[T any] interface {
@@ -56,10 +55,7 @@ func (wp *workerPool[T]) Start(callback func(data T) error) {
 		go func() {
 			defer wp.wg.Done()
 			for data := range wp.taskChan {
-				start := time.Now()
 				err := callback(data)
-				end := time.Now()
-				logrus.WithField("duration", end.Sub(start).Seconds()).WithField("start", start.Format(time.DateTime)).WithField("end", end.Format(time.DateTime)).Infoln("####### statistics ########")
 				if err != nil {
 					wp.errHandler(err)
 				}
