@@ -9,10 +9,35 @@ import (
 type Map[T any] interface {
 	Load(key string) (*T, error)
 	Store(key string, value T)
+	Delete(key string)
+	Export() map[string]T
+	Size() int
 }
 
 type impl[T any] struct {
 	m *sync.Map
+}
+
+func (i *impl[T]) Delete(key string) {
+	i.m.Delete(key)
+}
+
+func (i *impl[T]) Export() map[string]T {
+	m := map[string]T{}
+	i.m.Range(func(key, value interface{}) bool {
+		m[key.(string)] = value.(T)
+		return true
+	})
+	return m
+}
+
+func (i *impl[T]) Size() int {
+	count := 0
+	i.m.Range(func(key, value interface{}) bool {
+		count++
+		return true
+	})
+	return count
 }
 
 func Define[T any]() Map[T] {
