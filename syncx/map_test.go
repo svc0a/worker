@@ -1,15 +1,16 @@
-# worker
+package syncx
 
-```
-	Walk[User, error](list, func(user User) error {
-		logrus.Info(user)
-		return nil
-	})
-```
+import (
+	"github.com/sirupsen/logrus"
+	"testing"
+)
 
-# map
+type User struct {
+	Name string
+	Age  int
+}
 
-```
+func TestDefine(t *testing.T) {
 	m := Define[User]()
 	m.Store("user1", User{"tom", 18})
 	data, err := m.Load("user1")
@@ -18,4 +19,4 @@
 		return
 	}
 	logrus.Info(data)
-```
+}
