@@ -1,44 +1,53 @@
 package worker
 
 import (
+	"errors"
 	"github.com/sirupsen/logrus"
 	"sync"
 )
 
-type Pool[T any, Err error] interface {
-	Start(callback func(data T) Err)
-	Submit(data T)
-	Stop()
+type Worker[T any, Err error] interface {
+	start(callback func(data T) Err)
+	submit(data T)
+	stop()
 }
 
-// workerPool 管理协程池
-type workerPool[T any, Err error] struct {
+type worker[T any, Error error] struct {
 	numWorkers int
 	taskChan   chan T
 	wg         sync.WaitGroup
 	once       sync.Once
-	errHandler func(rsp Err)
+	errHandler func(rsp Error)
 }
 
-type Option[T any, Err error] func(pool *workerPool[T, Err])
+type Option[T any, Error error] func(pool *worker[T, Error])
 
-func WithErrHandler[T any, Err error](in func(err Err)) Option[T, Err] {
-	return func(wp *workerPool[T, Err]) {
+func WithErrHandler[T any, Error error](in func(err Error)) Option[T, Error] {
+	return func(wp *worker[T, Error]) {
 		wp.errHandler = in
 	}
 }
-func WithChanSize[T any, Err error](in int64) Option[T, Err] {
-	return func(wp *workerPool[T, Err]) {
+func WithChanSize[T any, Error error](in int64) Option[T, Error] {
+	return func(wp *worker[T, Error]) {
 		wp.taskChan = make(chan T, in)
 	}
 }
 
-// New 创建新的 workerPool 实例
-func New[T any, Err error](numWorkers int, options ...Option[T, Err]) Pool[T, Err] {
-	wp := &workerPool[T, Err]{
+func Walk[T any, Error error](list []T, f func(T) Error, options ...Option[T, Error]) {
+	wp := define[T, Error](1000, options...)
+	defer wp.stop()
+	for _, t := range list {
+		wp.submit(t)
+	}
+	wp.start(f)
+}
+
+// define 创建新的 workerPool 实例
+func define[T any, Error error](numWorkers int, options ...Option[T, Error]) Worker[T, Error] {
+	wp := &worker[T, Error]{
 		numWorkers: numWorkers,
 		taskChan:   make(chan T, numWorkers),
-		errHandler: func(err Err) {
+		errHandler: func(err Error) {
 			logrus.Error(err)
 		},
 	}
@@ -49,25 +58,29 @@ func New[T any, Err error](numWorkers int, options ...Option[T, Err]) Pool[T, Er
 }
 
 // Start 启动协程池
-func (wp *workerPool[T, Err]) Start(callback func(data T) Err) {
+func (wp *worker[T, Error]) start(callback func(data T) Error) {
 	for i := 0; i < wp.numWorkers; i++ {
 		wp.wg.Add(1)
 		go func() {
 			defer wp.wg.Done()
 			for data := range wp.taskChan {
-				wp.errHandler(callback(data))
+				err := callback(data)
+				if errors.Is(err, nil) {
+					continue
+				}
+				wp.errHandler(err)
 			}
 		}()
 	}
 }
 
 // Submit 提交任务到协程池
-func (wp *workerPool[T, Err]) Submit(data T) {
+func (wp *worker[T, Error]) submit(data T) {
 	wp.taskChan <- data
 }
 
 // Stop 关闭协程池并等待所有协程完成
-func (wp *workerPool[T, Err]) Stop() {
+func (wp *worker[T, Error]) stop() {
 	wp.once.Do(func() {
 		close(wp.taskChan) // 关闭任务通道，通知协程停止接收新任务
 		wp.wg.Wait()       // 等待所有协程完成任务
@@ -75,6 +88,6 @@ func (wp *workerPool[T, Err]) Stop() {
 }
 
 // PendingTasks 返回未处理的任务数量
-func (wp *workerPool[T, Err]) PendingTasks() int {
+func (wp *worker[T, Error]) PendingTasks() int {
 	return len(wp.taskChan)
 }

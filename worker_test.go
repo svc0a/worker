@@ -1,6 +1,7 @@
 package worker
 
 import (
+	"fmt"
 	"github.com/sirupsen/logrus"
 	"testing"
 )
@@ -11,19 +12,15 @@ type User struct {
 }
 
 func TestNew(t *testing.T) {
-	wp := New[User, error](1000, WithErrHandler[User, error](func(err error) {
-		if err != nil {
-			logrus.Error(err)
-		}
-	}))
-	for i := 0; i < 100; i++ {
-		wp.Submit(User{
-			Name: "test",
-			Age:  1,
+	list := []User{}
+	for i := 0; i < 10; i++ {
+		list = append(list, User{
+			Name: fmt.Sprintf("name%d", i),
+			Age:  i,
 		})
 	}
-	wp.Start(func(data User) error {
+	Walk[User, error](list, func(user User) error {
+		logrus.Info(user)
 		return nil
 	})
-	wp.Stop()
 }
