@@ -6,19 +6,20 @@ import (
 	"sync"
 )
 
-type Worker[T any] interface {
+type worker[T any] interface {
 	start(callback func(data T) error)
 	submit(data T)
 	stop()
+	pendingTasks() int
 }
 
 type config struct {
-	numWorkers int
-	chanSize   int
-	errHandler func(in error)
+	workerSize   int
+	chanSize     int
+	errorHandler func(in error)
 }
 
-type worker[T any] struct {
+type instance[T any] struct {
 	config
 	taskChan chan T
 	wg       sync.WaitGroup
@@ -27,15 +28,15 @@ type worker[T any] struct {
 
 type Option func(c *config)
 
-func WithErrHandler(f func(err error)) Option {
+func WithErrorHandler(f func(err error)) Option {
 	return func(c *config) {
-		c.errHandler = f
+		c.errorHandler = f
 	}
 }
 
-func WithWorkerNumber(workerNumber int) Option {
+func WithWorkerSize(workerSize int) Option {
 	return func(c *config) {
-		c.numWorkers = workerNumber
+		c.workerSize = workerSize
 	}
 }
 
@@ -55,11 +56,11 @@ func Walk[T any](list []T, f func(T) error, options ...Option) {
 }
 
 // define 创建新的 workerPool 实例
-func define[T any](options ...Option) Worker[T] {
+func define[T any](options ...Option) worker[T] {
 	c := &config{
-		numWorkers: 10,
+		workerSize: 10,
 		chanSize:   10,
-		errHandler: func(in error) {
+		errorHandler: func(in error) {
 			if in != nil {
 				logrus.Error(in)
 			}
@@ -68,16 +69,16 @@ func define[T any](options ...Option) Worker[T] {
 	for _, o := range options {
 		o(c)
 	}
-	var wp = &worker[T]{
+	var wp = &instance[T]{
 		config:   *c,
-		taskChan: make(chan T, c.numWorkers),
+		taskChan: make(chan T, c.workerSize),
 	}
 	return wp
 }
 
 // Start 启动协程池
-func (wp *worker[T]) start(callback func(data T) error) {
-	for i := 0; i < wp.numWorkers; i++ {
+func (wp *instance[T]) start(callback func(data T) error) {
+	for i := 0; i < wp.workerSize; i++ {
 		wp.wg.Add(1)
 		go func() {
 			defer wp.wg.Done()
@@ -86,19 +87,19 @@ func (wp *worker[T]) start(callback func(data T) error) {
 				if errors.Is(err, nil) {
 					continue
 				}
-				wp.errHandler(err)
+				wp.errorHandler(err)
 			}
 		}()
 	}
 }
 
 // Submit 提交任务到协程池
-func (wp *worker[T]) submit(data T) {
+func (wp *instance[T]) submit(data T) {
 	wp.taskChan <- data
 }
 
 // Stop 关闭协程池并等待所有协程完成
-func (wp *worker[T]) stop() {
+func (wp *instance[T]) stop() {
 	wp.once.Do(func() {
 		close(wp.taskChan) // 关闭任务通道，通知协程停止接收新任务
 		wp.wg.Wait()       // 等待所有协程完成任务
@@ -106,6 +107,6 @@ func (wp *worker[T]) stop() {
 }
 
 // PendingTasks 返回未处理的任务数量
-func (wp *worker[T]) PendingTasks() int {
+func (wp *instance[T]) pendingTasks() int {
 	return len(wp.taskChan)
 }

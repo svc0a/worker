@@ -26,8 +26,8 @@ func TestNew(t *testing.T) {
 		m.Store(user.Name, user)
 		time.Sleep(1 * time.Second)
 		return nil
-	}, WithErrHandler(func(err error) {
+	}, WithErrorHandler(func(err error) {
 		logrus.Error(err)
-	}), WithWorkerNumber(100), WithChanSize(100))
+	}), WithWorkerSize(100), WithChanSize(100))
 	logrus.Info(m.Size())
 }
