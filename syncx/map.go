@@ -14,15 +14,15 @@ type Map[T any] interface {
 	Size() int
 }
 
-type impl[T any] struct {
+type instance[T any] struct {
 	m *sync.Map
 }
 
-func (i *impl[T]) Delete(key string) {
+func (i *instance[T]) Delete(key string) {
 	i.m.Delete(key)
 }
 
-func (i *impl[T]) Export() map[string]T {
+func (i *instance[T]) Export() map[string]T {
 	m := map[string]T{}
 	i.m.Range(func(key, value interface{}) bool {
 		m[key.(string)] = value.(T)
@@ -31,7 +31,7 @@ func (i *impl[T]) Export() map[string]T {
 	return m
 }
 
-func (i *impl[T]) Size() int {
+func (i *instance[T]) Size() int {
 	count := 0
 	i.m.Range(func(key, value interface{}) bool {
 		count++
@@ -41,12 +41,12 @@ func (i *impl[T]) Size() int {
 }
 
 func Define[T any]() Map[T] {
-	return &impl[T]{
+	return &instance[T]{
 		m: &sync.Map{},
 	}
 }
 
-func (i *impl[T]) Load(key string) (*T, error) {
+func (i *instance[T]) Load(key string) (*T, error) {
 	val, ok := i.m.Load(key)
 	if !ok {
 		return nil, errors.New(fmt.Sprintf("%s not found", key))
@@ -58,6 +58,6 @@ func (i *impl[T]) Load(key string) (*T, error) {
 	return &t, nil
 }
 
-func (i *impl[T]) Store(key string, value T) {
+func (i *instance[T]) Store(key string, value T) {
 	i.m.Store(key, value)
 }
